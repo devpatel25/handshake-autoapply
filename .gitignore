@@ -1,0 +1,37 @@
+# ── Secrets / credentials (the persistent Chrome login profile lives at
+#    ~/.handshake_profile, OUTSIDE the repo) ────────────────────────────────────
+.env
+
+# ── Personal data (per-user; create from the *.example.* templates) ──────────
+data/*
+!data/.gitkeep
+!data/profile.example.json
+!data/candidate_facts.example.txt
+# Your config (copy from config.example.json — set your school's saved search):
+config.json
+
+# Your real, filled base résumés (the *.example.tex templates stay tracked):
+resume_templates/Resume_SWE_General.tex
+resume_templates/Resume_AI-ML_General.tex
+resume_templates/memory.txt
+
+# ── Generated outputs (regenerated each run; personal) ───────────────────────
+logs/*
+!logs/.gitkeep
+applications/
+resumes/
+cover_letters/
+analysis/
+*.pdf
+*.png
+
+# ── launchd schedule files (machine-specific paths + username) ───────────────
+*.plist
+
+# ── Backup git dirs ──────────────────────────────────────────────────────────
+.git.bak*/
+
+# ── Python / OS noise ────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,19 @@
+{
+  "name": "Your Name",
+  "email": "you@example.com",
+  "phone": "(000) 000-0000",
+  "location": "Your City, ST",
+  "address": "Street Address, City, ST",
+  "linkedin": "https://www.linkedin.com/in/yourhandle/",
+  "github": "",
+  "portfolio": "",
+  "current_company": "",
+  "gpa": "3.8",
+  "gpa_scale": "4.0",
+  "work_authorized_us": true,
+  "requires_sponsorship": false,
+  "willing_to_relocate": true,
+  "willing_in_office_hybrid": true,
+  "referred": false,
+  "_notes": "Copy to profile.json and set YOUR real values. work_authorized_us / requires_sponsorship drive deterministic screening answers. For EEO/demographic self-ID questions the bot selects 'decline to self-identify'."
+}

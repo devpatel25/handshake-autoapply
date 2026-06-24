@@ -1,0 +1,65 @@
+% TEMPLATE — copy to Resume_SWE_General.tex and replace every [PLACEHOLDER] with your
+% own details. This is the SWE / full-stack base variant the tailoring bot edits IN PLACE
+% (it weaves in each job's keywords; it never invents experience). Keep it to ONE page.
+\documentclass[a4paper,10pt]{article}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[none]{hyphenat}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+\titleformat{\section}{\fontsize{12}{14}\selectfont\bfseries}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{4pt}{2pt}
+\pagestyle{empty}
+\begin{document}
+
+\begin{center}
+{\fontsize{16}{18}\selectfont \textbf{[YOUR NAME]}}\\[2pt]
+\small [City, ST] $\bullet$ [(000) 000-0000] $\bullet$ \href{mailto:you@example.com}{you@example.com} $\bullet$ \href{https://linkedin.com/in/you}{LinkedIn} $\bullet$ \href{https://github.com/you}{GitHub}
+\end{center}
+
+\section*{Summary}
+[One or two lines: your target role, top skills, and a headline achievement. The bot
+rewrites this to match each job's exact title and top keywords.]
+
+\section*{Education}
+\textbf{[University]} \hfill [City, ST]\\
+[Degree, Major] \hfill [Start] -- [Expected Grad]\\
+Relevant Coursework: [Course, Course, Course, Course]
+
+\section*{Skills}
+\textbf{Languages:} [Python, Java, JavaScript/TypeScript, C++, SQL]\\
+\textbf{Frameworks \& Tools:} [React, Node, Spring Boot, Docker, Git, CI/CD]\\
+\textbf{Cloud \& Backend:} [AWS, REST APIs, Microservices, PostgreSQL, MongoDB]
+
+\section*{Work Experience}
+\textbf{[Company]} -- [Title] \hfill [Dates]
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+  \item [Impact bullet with a metric — what you built and the measurable result.]
+  \item [Second bullet — the technology used and the outcome.]
+  \item [Third bullet.]
+\end{itemize}
+
+\textbf{[Company]} -- [Title] \hfill [Dates]
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+  \item [Bullet with a metric.]
+  \item [Bullet.]
+\end{itemize}
+
+\section*{Projects}
+\textbf{[Project Name]} -- [one line on what it is]
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+  \item [What you built, the stack, and the result/metric.]
+  \item [Second bullet.]
+\end{itemize}
+
+\textbf{[Project Name]} -- [one line on what it is]
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+  \item [Bullet.]
+  \item [Bullet.]
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,10 @@
+{
+  "_note": "Required application documents the bot can auto-attach. Each entry: file (relative to the project root), doc_type (Handshake documentTypeId name), section_regex (modal header that signals the requirement), picker_query (text typed into the react-select to find the doc), auto_attach (attach without asking). Add entries here as new required uploads appear — no code change needed.",
+  "transcript": {
+    "file": "documents/transcript.pdf",
+    "doc_type": "transcript",
+    "section_regex": "attach your transcript",
+    "picker_query": "transcript",
+    "auto_attach": true
+  }
+}

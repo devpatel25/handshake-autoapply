@@ -1,0 +1,46 @@
+{
+  "_note": "Copy to config.json. Set saved_search_url to YOUR school's Handshake saved search (e.g. SWE/AI-ML + Internship/Co-op + US). Discovery paginates it; score.py filters + ranks. studentScreen drives visa filtering.",
+  "discover": {
+    "saved_search_url": "https://<your-school>.joinhandshake.com/job-search",
+    "max_minutes": 5,
+    "max_jobs": 150,
+    "scroll_pause_range": [2.0, 4.0]
+  },
+  "score": {
+    "shortlist_size": 20,
+    "job_types": ["internship", "co-op", "cooperative education", "co op"],
+    "title_keywords_bonus": {
+      "software engineer": 30, "software developer": 28, "\\bswe\\b": 28,
+      "machine learning": 32, "\\bml\\b": 18, "\\bai\\b": 16, "\\bllm\\b": 20, "genai|generative ai": 20,
+      "data scien": 28, "data engineer": 28, "backend|back[- ]?end": 22, "full[- ]?stack": 22,
+      "front[- ]?end": 16, "developer": 16, "\\bengineer\\b": 12, "data analyst": 12,
+      "data entry": -40, "help ?desk": -30, "it support": -25,
+      "\\bsales\\b|marketing|recruit": -25, "nurse|clinical|pharmac": -20,
+      "warehouse|driver|cashier|barista": -30
+    },
+    "weights": {
+      "cpt_opt_accepted": 25, "sponsors": 18, "visa_unknown": 0,
+      "posted_within_2d": 22, "posted_within_7d": 15, "posted_within_30d": 5,
+      "location_unsure": -8, "remote_us": 4
+    }
+  },
+  "apply": {
+    "max_per_day": 8,
+    "min_gap_seconds": 90,
+    "preference_mismatch_min_score": 40,
+    "tailor_parallelism": 6,
+    "max_retry_attempts": 4,
+    "unmet_max_attempts": 1
+  },
+  "supervisor": {
+    "max_diagnoses_per_run": 8
+  },
+  "fixer": {
+    "apply_enabled": true,
+    "fix_cap_per_run": 1,
+    "harvest_poll_seconds": 20,
+    "coding_pass_timeout": 300,
+    "tier1_files": ["fixer.py", "supervisor.py", "claude_runner.py", "config.json", ".gitignore", ".env"],
+    "tier2_files": ["auto_apply.py", "perception.py", "pipeline.py", "telegram_bot.py", "screening.py", "session_check.py", "browser.py"]
+  }
+}
