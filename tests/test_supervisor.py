@@ -149,6 +149,42 @@ class TestRunSupervisor(_TempState):
         self.assertNotIn("Nope", self.sent[0])
         self.assertEqual(self.wf(), {})
 
+    # ── discover-phase blind-spot escalations (2026-06-25 regression) ──────────
+    def _sentinel(self):
+        p = S.LOGS / f"supervisor_done_{self.now:%Y-%m-%d}.json"
+        return json.loads(p.read_text()) if p.exists() else {}
+
+    def test_discover_failed_escalates_not_silent(self):
+        # Empty results from a failed scrape used to report nothing; now it must surface.
+        S.run_supervisor([], now=self.now, use_brain=False,
+                         marked=False, new_postings=0, discover_failed=True)
+        self.assertTrue(self.sent, "a failed discover must send a report, not stay silent")
+        self.assertIn("Discovery failed", self.sent[0])
+        self.assertEqual(self._sentinel().get("needs_you"), 1)
+
+    def test_scraped_but_zero_applied_escalates(self):
+        S.run_supervisor([], now=self.now, use_brain=False,
+                         marked=False, new_postings=2, discover_failed=False)
+        self.assertTrue(self.sent)
+        self.assertIn("Scraped but applied 0", self.sent[0])
+        self.assertIn("2 new posting", self.sent[0])
+
+    def test_external_only_clean_day_no_false_alarm(self):
+        # New postings found but all external -> 0 applied AND day cleanly marked: no alarm.
+        S.run_supervisor([], now=self.now, use_brain=False,
+                         marked=True, new_postings=2, discover_failed=False)
+        self.assertEqual(self.sent, [])
+
+    def test_generic_escalation_suppressed_when_real_failure_surfaced(self):
+        # A real apply failure already fills needs_you -> don't add the generic gap line.
+        self.setp([self._entry("800", 1, "data_gap")])
+        S.run_supervisor([{"job": "Job 800", "job_id": "800", "result": "blocked_missing_documents"}],
+                         now=self.now, use_brain=False,
+                         marked=False, new_postings=2, discover_failed=False)
+        joined = "\n".join(self.sent)
+        self.assertNotIn("Scraped but applied 0", joined)
+        self.assertIn("Needs you", joined)
+
 
 class TestVerification(_TempState):
     def test_verify_targets(self):
