@@ -1,10 +1,19 @@
 {
-  "_note": "Required application documents the bot can auto-attach. Each entry: file (relative to the project root), doc_type (Handshake documentTypeId name), section_regex (modal header that signals the requirement), picker_query (text typed into the react-select to find the doc), instruction_keywords (substrings matched against the employer's free-text note in a generic 'Attach other required documents' section — typo-tolerant; falls back to a stem of the doc name), auto_attach (attach without asking). Add entries here as new required uploads appear — no code change needed.",
+  "_note": "Required application documents the bot can auto-attach. Fields: file (relative to project root), doc_type (Handshake documentTypeId NAME: resume=1, cover=2, transcript=3, other='Other Document'=5), name (the /docs name to upload/find it under; defaults to the picker_query), section_regex (modal header that signals the requirement), picker_query (text typed into the react-select), match (option text to click; defaults to picker_query — used to disambiguate same-content docs of different types), instruction_keywords (substrings matched, typo-tolerant, against the employer's free-text note in a generic 'Attach other required documents' section; only entries with doc_type='other' are eligible there, since Handshake requires that section's doc to be typed 'Other Document'), auto_attach. Add entries here as new required uploads appear.",
   "transcript": {
     "file": "documents/transcript.pdf",
     "doc_type": "transcript",
     "section_regex": "attach your transcript",
     "picker_query": "transcript",
+    "auto_attach": true
+  },
+  "other_document": {
+    "file": "documents/transcript.pdf",
+    "doc_type": "other",
+    "name": "Transcript (Other Document)",
+    "section_regex": "attach other required documents",
+    "picker_query": "Transcript",
+    "match": "Other Document",
     "instruction_keywords": ["transcript", "transcipt", "transc"],
     "auto_attach": true
   }

@@ -166,7 +166,7 @@ def upload_resume_to_docs(page, pdf_path, name, doc_type="resume"):
                     pass
         # Document Type: defaults to Resume; set it explicitly for non-resume docs
         # (e.g. a transcript -> documentTypeId 3) so it lands in the right picker.
-        type_val = {"resume": "1", "cover": "2", "transcript": "3"}.get(doc_type)
+        type_val = {"resume": "1", "cover": "2", "transcript": "3", "other": "5"}.get(doc_type)
         if type_val and type_val != "1":
             try:
                 page.select_option('select[name="documentTypeId"]', value=type_val)
@@ -212,6 +212,37 @@ def ensure_transcript_doc(page):
         ok = upload_resume_to_docs(page, str(tpath), "Transcript", doc_type="transcript")
         _transcript_ensured = bool(ok)
         return _transcript_ensured
+    except Exception:
+        return False
+
+
+_ensured_other = set()
+
+
+def ensure_registry_other_doc(page, name, spec):
+    """Ensure a type-'Other Document' (id 5) doc exists in /docs for the GENERIC 'Attach
+    other required documents' section. Handshake rejects that section's submit unless the
+    attached doc is typed 'Other Document', so a transcript filed as type 'Transcript'
+    (id 3) is NOT accepted there — we keep a separate copy filed as 'Other Document'. Runs
+    at most once per run per doc; navigates to /docs, so call BEFORE opening the apply modal
+    (alongside ensure_transcript_doc). Degrades safely — a miss leaves the other_docs_ok
+    fail-safe to block the submit."""
+    if name in _ensured_other:
+        return True
+    fpath = HERE / spec.get("file", "")
+    if not fpath.exists():
+        return False
+    docname = spec.get("name", name)
+    try:
+        page.goto(f"{browser.BASE_URL}/docs", wait_until="domcontentloaded")
+        time.sleep(3)
+        if docname.lower() in (page.inner_text("body") or "").lower():
+            _ensured_other.add(name)
+            return True
+        ok = upload_resume_to_docs(page, str(fpath), docname, doc_type=spec.get("doc_type", "other"))
+        if ok:
+            _ensured_other.add(name)
+        return bool(ok)
     except Exception:
         return False
 
@@ -265,7 +296,7 @@ def update_slot_resume(page, pdf_path, slot_name, slot_id=SLOT_DOC_ID, doc_type=
             pub.uncheck()
         # Handshake's documentTypeId options are numeric ids (1=Resume, 2=Cover Letter,
         # 3=Transcript); the labels are rendered by a custom widget, so match by id.
-        type_val = {"resume": "1", "cover": "2", "transcript": "3"}.get(doc_type)
+        type_val = {"resume": "1", "cover": "2", "transcript": "3", "other": "5"}.get(doc_type)
         sel = page.query_selector('select[name="documentTypeId"]')
         if sel and type_val:
             try:
@@ -370,6 +401,10 @@ def _match_other_doc(instruction: str, registry: dict):
         return None
     for name, spec in (registry or {}).items():
         if name.startswith("_"):
+            continue
+        # The generic section is enforced to require a doc typed 'Other Document' (id 5),
+        # so only doc_type='other' entries can satisfy it (a type-3 transcript is rejected).
+        if spec.get("doc_type") != "other":
             continue
         kws = spec.get("instruction_keywords")
         if not kws:
@@ -591,6 +626,12 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
             # Ensure the static transcript doc exists in /docs (once per run) so jobs
             # that require one can attach it. No-op after the first time this run.
             ensure_transcript_doc(page)
+            # Same for any 'Other Document' (type 5) the generic 'other required documents'
+            # section may need — upload here (navigates to /docs) BEFORE the modal opens, so
+            # the in-modal attach just selects it without navigating away.
+            for _rn, _rspec in perception.load_registry().items():
+                if not _rn.startswith("_") and _rspec.get("doc_type") == "other":
+                    ensure_registry_other_doc(page, _rn, _rspec)
 
             # 2) Open the job.
             page.goto(url, wait_until="domcontentloaded")
@@ -650,10 +691,11 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
                     _other_docs_instruction(modal.inner_text()), perception.load_registry())
                 if other_doc_match:
                     name, spec = other_doc_match
-                    if name == "transcript":
-                        ensure_transcript_doc(page)   # idempotent; ensures it's in /docs
-                    pq = spec.get("picker_query", name)
-                    _attach_other_doc_in_modal(page, modal, pq, match=pq)
+                    # The doc was already uploaded to /docs above (pre-modal); just select it.
+                    # match disambiguates the type-5 'Other Document' from the same-named
+                    # type-3 transcript, which Handshake rejects in this section.
+                    pq = spec.get("picker_query") or spec.get("name") or name
+                    _attach_other_doc_in_modal(page, modal, pq, match=spec.get("match") or pq)
                     browser.human_pause(1, 2)
 
             mtext = modal.inner_text()

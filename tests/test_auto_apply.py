@@ -19,8 +19,11 @@ import auto_apply as A  # noqa: E402
 
 REG = {
     "_note": "ignored",
-    "transcript": {"picker_query": "transcript",
-                   "instruction_keywords": ["transcript", "transcipt", "transc"]},
+    # standard-section transcript (type 3) — NOT eligible for the generic section
+    "transcript": {"doc_type": "transcript", "picker_query": "transcript"},
+    # the 'Other Document' (type 5) copy the generic section requires
+    "other_document": {"doc_type": "other", "picker_query": "Transcript", "match": "Other Document",
+                       "instruction_keywords": ["transcript", "transcipt", "transc"]},
 }
 
 
@@ -37,10 +40,15 @@ class TestMatchOtherDoc(unittest.TestCase):
         # the real Global Radio Outreach note — 'Transcipt' is the employer's typo
         m = A._match_other_doc("Transcipt if available", REG)
         self.assertIsNotNone(m)
-        self.assertEqual(m[0], "transcript")
+        self.assertEqual(m[0], "other_document")        # the type-5 entry, not the type-3 one
 
     def test_matches_correct_spelling(self):
-        self.assertEqual(A._match_other_doc("Please attach your transcript", REG)[0], "transcript")
+        self.assertEqual(A._match_other_doc("Please attach your transcript", REG)[0], "other_document")
+
+    def test_only_other_type_eligible(self):
+        # a transcript-typed entry must NOT satisfy the generic section (Handshake rejects it)
+        reg = {"transcript": {"doc_type": "transcript", "instruction_keywords": ["transc"]}}
+        self.assertIsNone(A._match_other_doc("transcript", reg))
 
     def test_no_match_for_portfolio(self):
         # we have no portfolio doc -> must NOT match (so the fail-safe blocks, not bad-submits)
@@ -50,11 +58,12 @@ class TestMatchOtherDoc(unittest.TestCase):
         self.assertIsNone(A._match_other_doc("", REG))
 
     def test_default_stem_when_no_keywords(self):
-        reg = {"transcript": {"picker_query": "transcript"}}  # no instruction_keywords
-        self.assertEqual(A._match_other_doc("transcipt if available", reg)[0], "transcript")
+        # no instruction_keywords -> falls back to a 6-char stem of the entry NAME ('transc')
+        reg = {"transcript_other": {"doc_type": "other", "picker_query": "transcript"}}
+        self.assertEqual(A._match_other_doc("transcipt if available", reg)[0], "transcript_other")
 
     def test_skips_underscore_entries(self):
-        reg = {"_note": {"instruction_keywords": ["transc"]}}
+        reg = {"_note": {"doc_type": "other", "instruction_keywords": ["transc"]}}
         self.assertIsNone(A._match_other_doc("transcript", reg))
 
 
