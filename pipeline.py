@@ -861,10 +861,28 @@ def main():
             return
 
         # 2. discover
+        discover_failed = False
         if not args.no_scrape:
             bump_watchdog(SCRAPE_BUDGET)
             if not run_stage("discover", [PY, "discover.py"]):
-                _notify("⚠️ Discovery failed; trying with any existing jobs file.")
+                # A failed discover is almost always a transient network/site outage
+                # (e.g. net::ERR_INTERNET_DISCONNECTED). It must NOT let the run mark the
+                # day done off stale/empty data — that silently burns every later slot
+                # (the 2026-06-25 incident: net dropped mid-day, discover failed, 0 jobs,
+                # "clean" run marked the day, 16:30/18:30/20:30 all skipped). We still
+                # attempt a fallback if today's jobs file already exists, but the day is
+                # left UNMARKED below so a later slot re-scrapes once the net is back.
+                discover_failed = True
+                jobs_today = DATA / f"jobs_{today}.json"
+                if jobs_today.exists():
+                    _notify("⚠️ Discovery failed (network/site issue). Falling back to "
+                            "today's existing jobs file; day left UNMARKED so a later "
+                            "slot re-scrapes.")
+                else:
+                    _notify("⚠️ Discovery failed and there's no jobs file for today — "
+                            "nothing to process. Day left UNMARKED so a later slot retries.")
+                    log("discover failed and no fresh jobs file; aborting (unmarked).")
+                    return
 
         # 3. score
         bump_watchdog(SCORE_BUDGET)
@@ -875,8 +893,9 @@ def main():
         shortlist_path = DATA / f"shortlist_{today}.json"
         shortlist = json.loads(shortlist_path.read_text()) if shortlist_path.exists() else []
 
-        # 4. announce (pings even on a 0-new day)
-        stats.announce_new_postings(shortlist)
+        # 4. announce (pings even on a 0-new day); keep the count so the supervisor can
+        #    flag a "scraped N but applied 0" gap instead of staying silent.
+        new_count = stats.announce_new_postings(shortlist)
 
         # 5. classify + re-queue pending
         todo = eligible(shortlist, args.limit)
@@ -914,13 +933,21 @@ def main():
             log(f"  {r['result']:<24} {r['job']}")
 
         failures = [r for r in results if r.get("system_failure")]
-        if failures:
-            log(f"{len(failures)} system failure(s) — leaving today UNMARKED so it retries.")
+        # A degraded discover (stale/empty data) is treated like a system failure for the
+        # mark/retry decision: never mark a day done when we couldn't actually scrape.
+        marked = not (failures or discover_failed)
+        if not marked:
+            reasons = []
+            if failures:
+                reasons.append(f"{len(failures)} system failure(s)")
+            if discover_failed:
+                reasons.append("discovery failed (degraded/stale data)")
+            log(f"{' + '.join(reasons)} — leaving today UNMARKED so it retries.")
         else:
             mark_ran_today()
             log("Run clean — marked as done for today.")
 
-        stats.record_run(shortlist, results, marked=not failures)
+        stats.record_run(shortlist, results, marked=marked)
 
         # Supervisor: classify outcomes, prune the doomed retry queue into wontfix.json,
         # and send ONE consolidated report (replaces the old per-result chatter + the
@@ -930,7 +957,8 @@ def main():
         # slow audit can't trip the watchdog mid-report.
         bump_watchdog(MAX_DIAGNOSES_PER_RUN * 140 + 120)
         try:
-            supervisor.run_supervisor(results, shortlist, marked=not failures)
+            supervisor.run_supervisor(results, shortlist, marked=marked,
+                                      new_postings=new_count, discover_failed=discover_failed)
         except Exception as e:
             log(f"supervisor failed (run still complete): {type(e).__name__}: {e}")
     finally:

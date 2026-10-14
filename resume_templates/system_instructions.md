@@ -62,6 +62,8 @@ Both the `.pdf` and `.tex` output files use this same base name.
 
 You are also an expert ATS keyword extraction specialist. Extract the most critical keywords from the job description to maximize ATS scoring and job matching probability.
 
+**Pre-extracted list:** If a keyword list is supplied in the task prompt (a "KEYWORDS (pre-extracted …)" block), use it as the extracted list and skip extraction — do not add, drop, or re-order terms. Output it as the **Extracted Keywords:** line (Job Title first, then Must-have, then Nice-to-have) and continue with Phase 2.
+
 ### What to Extract
 
 **Job Title (HIGHEST PRIORITY — always first in the list):**
@@ -153,7 +155,7 @@ You MUST integrate every keyword from the extracted list into the resume. These 
 ### Keyword Integration Rules
 
 - **MANDATORY**: ALL extracted keywords MUST appear naturally somewhere in the resume
-- **Job Title**: Integrate the EXACT job title into the Summary section naturally
+- **Job Title**: Put the EXACT job title in the headline line under the candidate's name (see 4A). The resume has NO Summary section — never add one.
 - **Exact Matching**: Use keywords EXACTLY as extracted — preserve spelling, casing, and acronyms
 - **Context Preservation**: Only place keywords where they make logical sense given the candidate's real experience. NEVER fabricate experience.
 
@@ -161,7 +163,7 @@ You MUST integrate every keyword from the extracted list into the resume. These 
 
 | Keyword Position in List | Required Placement |
 |--------------------------|-------------------|
-| Keywords 1–5 (highest priority) | Must appear in **Summary** AND at least once in **Experience or Projects** |
+| Keywords 1–5 (highest priority) | Must appear in **Skills** AND at least once in **Experience or Projects** |
 | Keywords 6–15 | Must appear in **Skills** section AND at least once in **Experience or Projects** |
 | Keywords 16+ | Must appear at least once anywhere appropriate |
 
@@ -176,11 +178,11 @@ You MUST integrate every keyword from the extracted list into the resume. These 
 
 ## PHASE 4: Content Optimization
 
-### 4A — Summary Section
-- Integrate the TOP 5 extracted keywords
-- Structure: "[Job Title] with expertise in [keyword 1], [keyword 2], and [keyword 3]. [Achievement with keyword 4]. [Domain expertise with keyword 5]."
-- Maximum 2–3 lines, under 50 words total
-- Lead with the most relevant job title keyword
+### 4A — Headline (NO Summary section)
+- The resume has NO Summary section. Never add one, and never add a paragraph between the header and Education.
+- The base has a one-line headline under the name inside the `\begin{center}` block (e.g. `Software Engineer \textbar\ AI/ML Systems`). Replace its text with the EXACT job title from the posting, optionally followed by `\textbar\ ` and one truthful focus area (e.g. `Machine Learning Engineer Co-op \textbar\ RAG \& LLM Systems`).
+- Keep it to one line, at most 8 words. Do not add or change any `\vspace` around it.
+- Strip level/seniority words the candidate cannot claim (e.g. "Senior", "Staff", "Lead"); keep "Intern", "Co-op", "New Grad" as posted.
 
 ### 4B — Skills Section Reorganization
 - Create/adjust skill categories based on keyword clustering:
@@ -191,7 +193,13 @@ You MUST integrate every keyword from the extracted list into the resume. These 
 - Order skills within each category by keyword priority (most important first)
 - Place ALL technical keywords from the extracted list in relevant categories
 
-### 4C — Work Experience Enhancement
+### 4C — XYZ Bullets (Top 1–2 per Role/Project Only)
+- For each work-experience entry and each project, rewrite only the **top 1–2 bullets** in the XYZ form: "Accomplished [X], as measured by [Y], by doing [Z]".
+- Use ONLY metrics that already exist in the base resume. If a bullet has no real metric, write it as "Did [X] by doing [Z]" — **NEVER invent a number**.
+- Leave all other bullets in their current style.
+- The ~29-word bullet cap and all density rules still apply.
+
+### 4D — Work Experience Enhancement
 For each role:
 - Scan the extracted keywords for terms relevant to that role's domain
 - Integrate matching keywords into existing bullet points naturally
@@ -200,13 +208,15 @@ For each role:
 - Start bullets with strong action verbs
 - Keep each bullet under 29 words
 
-### 4D — Projects Section Enhancement
-- For each project, integrate 3–5 relevant keywords from the extracted list
-- Expand descriptions for projects that align with the top 10 keywords
-- Add technical implementation details using exact keyword terminology
-- If space is tight, minimize or remove projects with zero keyword relevance
+### 4E — Projects Section (select from the Project Bank)
+- The Projects section holds **3 or 4 projects chosen from the APPENDIX: Project Bank** appended after these instructions (from `project_bank.md`; if no bank is appended, keep the base variant's projects). The base variant's projects are only a default — swap any of them for a bank project with more keyword overlap.
+- **Selection**: rank bank entries by overlap with the extracted keywords (top 10 weigh most), then by the entry's Tags matching the role type. Pick the top 3. Add a 4th only when the page clearly has room (see Phase 6 for overflow order).
+- **Never** use a project that is not in the bank, and never pick two entries that describe the same work.
+- **Order**: most relevant project first (the "lead"). The lead gets 3 bullets if its bank entry has a 3rd bullet; every other project gets exactly 2 bullets.
+- Use the entry's title line verbatim (it carries the GitHub `\href`). Copy the itemize block format of the base's projects exactly (`\begin{itemize}[leftmargin=*, itemsep=0pt, parsep=1pt]` + `\vspace{-6mm}`, and `\vspace{-2mm}` between projects) so the `\vspace` sequence matches the base.
+- Rephrase bank bullets to weave in 3–5 relevant keywords each — but ONLY where the bank's stated facts support it. Never add a tool, number, or claim the bank entry does not state. Keep every metric in the bullets you use.
 
-### 4E — Education Section
+### 4F — Education Section
 - Add "Relevant Coursework" ONLY if the extracted keywords contain course-related terms
 - Include specialization keywords that align with the MS focus area
 
@@ -231,7 +241,7 @@ For each role:
 
 **Section Structure:**
 - `\section*{Section Name}` format
-- Order of sections: Summary → Education → Skills → Work Experience → Projects
+- Order of sections: Education → Skills → Work Experience → Projects (there is NO Summary section)
 - All `\textbf{}` and `\textit{}` formatting
 - Date alignment using `\hfill`
 
@@ -271,16 +281,14 @@ pdfinfo resume.pdf | grep Pages
 
 **Step 4: If the PDF is MORE than 1 page, apply these fixes IN ORDER:**
 
-Priority 1 — Content trimming (DO NOT touch margins or spacing):
-1. Shorten bullet points — cut filler words, merge redundant points
-2. Reduce lowest-priority project descriptions (fewest keyword matches)
-3. Remove the least relevant project entirely if needed
-4. Trim the Summary to 1–2 lines if currently 3
-5. Reduce coursework list if present
+Content trimming, IN THIS ORDER (DO NOT touch margins or spacing):
+1. Shorten the **Others** skills line (drop the least job-relevant soft skills), then the **Certifications** line (keep the most relevant ones)
+2. Shorten bullet points — cut filler words, merge redundant phrasing, each under ~29 words
+3. If a 4th project is present, remove it (the least relevant one)
+4. Reduce the coursework lines
+5. Last resort: cut the lead project's 3rd bullet
 
-Priority 2 — If still over 1 page after all content trimming:
-6. Reduce bullets per job from 4 → 3 (keep the ones with highest keyword density)
-7. Remove the oldest or least relevant work experience entry
+Never go below 3 projects, never drop a work-experience entry or bullet, never remove a whole skill-category line.
 
 **NEVER DO THESE to fix page length:**
 - ❌ Change margins or geometry
@@ -315,7 +323,7 @@ Deliver both files to the user.
 Before delivering, ensure:
 - [ ] ALL extracted keywords are integrated at least once
 - [ ] Top 5 keywords appear in multiple sections
-- [ ] Keywords are distributed across Summary, Skills, Experience, and Projects
+- [ ] Keywords are distributed across Headline, Skills, Experience, and Projects
 - [ ] Exact keyword spelling and formatting preserved
 - [ ] Standard ATS-readable section headers used
 - [ ] No images, tables, or graphics that break ATS parsing
@@ -334,7 +342,8 @@ Before delivering, ensure:
 - [ ] PDF compiles without errors
 - [ ] PDF is exactly ONE page
 - [ ] Every bullet is under 29 words
-- [ ] Summary is under 50 words
+- [ ] NO Summary section; headline holds the exact job title
+- [ ] 3–4 projects, all from the Project Bank, none invented
 - [ ] All `&` escaped as `\&`
 - [ ] Bold text uses `\textbf{}` (never `**`)
 - [ ] All existing metrics and achievements preserved
@@ -353,14 +362,14 @@ Before delivering, ensure:
 - Exceed one page
 - Use `**` for bold (use `\textbf{}`)
 - Deliver without compiling and verifying page count
-- Skip the keyword extraction step
+- Skip the keyword extraction step (unless a pre-extracted keyword list is supplied in the task prompt — then use it)
 - Skip the base resume selection step
 - Ask the user for keywords or file name — extract and generate them yourself
 - Include generic filler words in the keyword list ("experience", "skills", "team", "opportunity")
 - Invent keywords not present in the job description
 
 ✅ **ALWAYS:**
-- Extract keywords automatically from the job description
+- Extract keywords automatically from the job description (or use the pre-extracted list when one is supplied)
 - Display the extracted keywords to the user
 - Extract Job Title and Company Name automatically
 - Select the best base resume variant for the role

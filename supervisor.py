@@ -342,12 +342,18 @@ def _send(msg):
 
 
 # ── in-process entry point ────────────────────────────────────────────────────
-def run_supervisor(results, shortlist=None, marked=True, now=None, use_brain=True):
+def run_supervisor(results, shortlist=None, marked=True, now=None, use_brain=True,
+                   new_postings=0, discover_failed=False):
     """Classify results, optionally diagnose the escalations with the brain, prune the
     retry queue, write the day's sentinel, and send ONE consolidated report. Best-effort;
-    never raises into the pipeline."""
+    never raises into the pipeline.
+
+    new_postings / discover_failed let the supervisor see DISCOVER-phase health, not just
+    apply outcomes — otherwise an empty results list (a failed scrape) reports nothing and
+    the supervisor stays silent on a day that applied to nobody (the 2026-06-25 blind spot)."""
     try:
-        _run(results or [], now or datetime.now(), use_brain=use_brain)
+        _run(results or [], now or datetime.now(), use_brain=use_brain,
+             marked=marked, new_postings=new_postings, discover_failed=discover_failed)
     except Exception as e:
         try:
             print(f"[supervisor] error: {type(e).__name__}: {e}", flush=True)
@@ -358,7 +364,7 @@ def run_supervisor(results, shortlist=None, marked=True, now=None, use_brain=Tru
             pass
 
 
-def _run(results, now, use_brain=True):
+def _run(results, now, use_brain=True, marked=True, new_postings=0, discover_failed=False):
     pending = _load(PENDING_FILE, [])
     pend_by_id = {str(p.get("job_id")): p for p in pending}
     result_ids = {str(r.get("job_id") or "") for r in results}
@@ -421,6 +427,23 @@ def _run(results, now, use_brain=True):
             reason = f"open & unresolved for over {AGE_OUT_DAYS} days — removed from auto-retry"
             evict[jid] = {"title": title, "reason": reason}
             needs_you.append((title, reason, None))
+
+    # Discover-phase blind spot: the loop above only sees APPLY outcomes, so a run that
+    # failed to scrape/classify (empty results) would report nothing and stay silent —
+    # exactly how the 2026-06-25 outage silently burned a day. Escalate when discovery
+    # failed, or when we scraped new postings but applied to none and the day was left
+    # unmarked (something blocked applying; it will retry). The second case only fires when
+    # nothing else surfaced, so a normal failure report isn't duplicated. A clean day that
+    # applied to 0 because every new posting was external (marked=True) is NOT escalated.
+    if discover_failed:
+        needs_you.append(("⚠️ Discovery failed",
+                          "couldn't scrape/classify Handshake postings (network/site?); "
+                          "day left unmarked — auto-retries next slot", None))
+    elif (new_postings and not applied and not marked
+          and not (needs_you or auto_fixed or session_action)):
+        needs_you.append(("⚠️ Scraped but applied 0",
+                          f"{new_postings} new posting(s) found but none applied; run left "
+                          "unmarked — auto-retries next slot", None))
 
     if evict:
         _commit_evictions(pending, evict, now)

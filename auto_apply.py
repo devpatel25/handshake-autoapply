@@ -82,6 +82,24 @@ FIND_TRANSCRIPT_CB = r"""(root)=>{
   return null;
 }"""
 
+# Some employers request a doc (transcript/portfolio/...) via a GENERIC catch-all section
+# titled 'Attach other required documents' with free-text instructions, instead of the
+# dedicated transcript section. Its react-select is the combobox after that h4 (fallback:
+# the picker whose placeholder mentions 'other document').
+FIND_OTHER_DOCS_CB = r"""(root)=>{
+  const h4=[...root.querySelectorAll('h4')];
+  const o=h4.find(h=>/attach other required documents/i.test(h.innerText));
+  if(o){
+    for(const cb of root.querySelectorAll('input[role=combobox]')){
+      if(o.compareDocumentPosition(cb)&Node.DOCUMENT_POSITION_FOLLOWING) return cb;
+    }
+  }
+  for(const cb of root.querySelectorAll('input[role=combobox]')){
+    if(((cb.getAttribute('placeholder')||'').toLowerCase()).includes('other document')) return cb;
+  }
+  return null;
+}"""
+
 
 def _apply_modal(page):
     """The apply dialog (filtering out the 'It's better on the app' promo dialog)."""
@@ -148,7 +166,7 @@ def upload_resume_to_docs(page, pdf_path, name, doc_type="resume"):
                     pass
         # Document Type: defaults to Resume; set it explicitly for non-resume docs
         # (e.g. a transcript -> documentTypeId 3) so it lands in the right picker.
-        type_val = {"resume": "1", "cover": "2", "transcript": "3"}.get(doc_type)
+        type_val = {"resume": "1", "cover": "2", "transcript": "3", "other": "5"}.get(doc_type)
         if type_val and type_val != "1":
             try:
                 page.select_option('select[name="documentTypeId"]', value=type_val)
@@ -194,6 +212,37 @@ def ensure_transcript_doc(page):
         ok = upload_resume_to_docs(page, str(tpath), "Transcript", doc_type="transcript")
         _transcript_ensured = bool(ok)
         return _transcript_ensured
+    except Exception:
+        return False
+
+
+_ensured_other = set()
+
+
+def ensure_registry_other_doc(page, name, spec):
+    """Ensure a type-'Other Document' (id 5) doc exists in /docs for the GENERIC 'Attach
+    other required documents' section. Handshake rejects that section's submit unless the
+    attached doc is typed 'Other Document', so a transcript filed as type 'Transcript'
+    (id 3) is NOT accepted there — we keep a separate copy filed as 'Other Document'. Runs
+    at most once per run per doc; navigates to /docs, so call BEFORE opening the apply modal
+    (alongside ensure_transcript_doc). Degrades safely — a miss leaves the other_docs_ok
+    fail-safe to block the submit."""
+    if name in _ensured_other:
+        return True
+    fpath = HERE / spec.get("file", "")
+    if not fpath.exists():
+        return False
+    docname = spec.get("name", name)
+    try:
+        page.goto(f"{browser.BASE_URL}/docs", wait_until="domcontentloaded")
+        time.sleep(3)
+        if docname.lower() in (page.inner_text("body") or "").lower():
+            _ensured_other.add(name)
+            return True
+        ok = upload_resume_to_docs(page, str(fpath), docname, doc_type=spec.get("doc_type", "other"))
+        if ok:
+            _ensured_other.add(name)
+        return bool(ok)
     except Exception:
         return False
 
@@ -247,7 +296,7 @@ def update_slot_resume(page, pdf_path, slot_name, slot_id=SLOT_DOC_ID, doc_type=
             pub.uncheck()
         # Handshake's documentTypeId options are numeric ids (1=Resume, 2=Cover Letter,
         # 3=Transcript); the labels are rendered by a custom widget, so match by id.
-        type_val = {"resume": "1", "cover": "2", "transcript": "3"}.get(doc_type)
+        type_val = {"resume": "1", "cover": "2", "transcript": "3", "other": "5"}.get(doc_type)
         sel = page.query_selector('select[name="documentTypeId"]')
         if sel and type_val:
             try:
@@ -328,6 +377,74 @@ def _attach_transcript_in_modal(page, modal):
         return bool(cb) and _pick_in_combobox(page, cb, "transcript")
     except Exception:
         return False
+
+
+def _other_docs_instruction(modal_text: str) -> str:
+    """The employer's free-text note under the generic 'Attach other required documents'
+    section (e.g. 'Transcipt if available'). Scoped to that section so a different
+    section's instruction line can't leak in."""
+    m = re.search(r'attach other required documents\b.*?instructions from employer:\s*([^\n]+)',
+                  modal_text, re.I | re.S)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r'instructions from employer:\s*([^\n]+)', modal_text, re.I)
+    return m.group(1).strip() if m else ""
+
+
+def _match_other_doc(instruction: str, registry: dict):
+    """Map the employer's free-text 'other required documents' note to a registry doc we
+    have, or None. Matches each entry's instruction_keywords (falling back to a typo-
+    tolerant stem of the doc name), so 'Transcipt if available' (employer's typo) still
+    resolves to the transcript. Returns (name, spec)."""
+    text = (instruction or "").lower()
+    if not text:
+        return None
+    for name, spec in (registry or {}).items():
+        if name.startswith("_"):
+            continue
+        # The generic section is enforced to require a doc typed 'Other Document' (id 5),
+        # so only doc_type='other' entries can satisfy it (a type-3 transcript is rejected).
+        if spec.get("doc_type") != "other":
+            continue
+        kws = spec.get("instruction_keywords")
+        if not kws:
+            stem = re.sub(r"[^a-z]", "", name.lower())[:6]
+            kws = [stem] if stem else []
+        if any(kw and kw.lower() in text for kw in kws):
+            return name, spec
+    return None
+
+
+def _attach_other_doc_in_modal(page, modal, picker_query, match=None):
+    """Attach a registry doc (e.g. the transcript) to the GENERIC 'Attach other required
+    documents' section — same react-select mechanics as the dedicated pickers. Returns
+    True if tried."""
+    try:
+        cb = modal.evaluate_handle(FIND_OTHER_DOCS_CB).as_element()
+        return bool(cb) and _pick_in_combobox(page, cb, picker_query, match=match)
+    except Exception:
+        return False
+
+
+def _attached_other_doc_name(modal):
+    """The doc shown attached (green box) in the generic 'Attach other required documents'
+    section; None while it's still empty (shows the search placeholder / 'Please enter a
+    valid response')."""
+    txt = modal.inner_text()
+    m = re.search(r'attach other required documents(.*?)(?:\n\s*attach your[^\n]*|\Z)',
+                  txt, re.I | re.S)
+    sec = m.group(1) if m else ""
+    skip = ("or", "upload new", "preview document", "search your other documents",
+            "set as default resume", "please enter a valid response")
+    for line in sec.splitlines():
+        v = line.strip()
+        low = v.lower()
+        if not v or low.startswith("instructions from employer") or low.startswith("attach "):
+            continue
+        if low in skip or "please enter a valid response" in low:
+            continue
+        return v
+    return None
 
 
 def _attached_resume_name(modal):
@@ -509,6 +626,12 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
             # Ensure the static transcript doc exists in /docs (once per run) so jobs
             # that require one can attach it. No-op after the first time this run.
             ensure_transcript_doc(page)
+            # Same for any 'Other Document' (type 5) the generic 'other required documents'
+            # section may need — upload here (navigates to /docs) BEFORE the modal opens, so
+            # the in-modal attach just selects it without navigating away.
+            for _rn, _rspec in perception.load_registry().items():
+                if not _rn.startswith("_") and _rspec.get("doc_type") == "other":
+                    ensure_registry_other_doc(page, _rn, _rspec)
 
             # 2) Open the job.
             page.goto(url, wait_until="domcontentloaded")
@@ -555,11 +678,33 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
                 _attach_transcript_in_modal(page, modal)
                 browser.human_pause(1, 2)
 
+            # Generic 'Attach other required documents' section: some employers ask for the
+            # transcript (or a portfolio, etc.) here via free-text instructions instead of
+            # the dedicated section — Handshake enables Submit but rejects the click if it's
+            # left empty ("Please enter a valid response"). Map the instruction to a registry
+            # doc we have (transcript, typo-tolerant) and attach it through this picker too.
+            has_other_docs_section = bool(re.search(r"attach other required documents",
+                                                    modal.inner_text(), re.I))
+            other_doc_match = None
+            if has_other_docs_section:
+                other_doc_match = _match_other_doc(
+                    _other_docs_instruction(modal.inner_text()), perception.load_registry())
+                if other_doc_match:
+                    name, spec = other_doc_match
+                    # The doc was already uploaded to /docs above (pre-modal); just select it.
+                    # match disambiguates the type-5 'Other Document' from the same-named
+                    # type-3 transcript, which Handshake rejects in this section.
+                    pq = spec.get("picker_query") or spec.get("name") or name
+                    _attach_other_doc_in_modal(page, modal, pq, match=spec.get("match") or pq)
+                    browser.human_pause(1, 2)
+
             mtext = modal.inner_text()
             preference_mismatch = bool(re.search(r"do(es)?(n'?t| not) meet", mtext, re.I))
             has_cover_section = bool(re.search(r"attach your cover letter", mtext, re.I))
             transcript_attached = _attached_transcript_name(modal) if has_transcript_section else None
             transcript_ok = (not has_transcript_section) or bool(transcript_attached)
+            other_doc_attached = _attached_other_doc_name(modal) if has_other_docs_section else None
+            other_docs_ok = (not has_other_docs_section) or bool(other_doc_attached)
             attached = _attached_resume_name(modal)
             resume_ok = bool(attached and resume_name.lower() in attached.lower())
             if use_slot:
@@ -584,6 +729,8 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
                     "has_cover_section": has_cover_section, "cover_pdf": cover_pdf,
                     "has_transcript_section": has_transcript_section,
                     "attached_transcript": transcript_attached,
+                    "has_other_docs_section": has_other_docs_section,
+                    "attached_other_doc": other_doc_attached,
                     "screenshot": str(SHOTS / shot)}
 
             # 3) FAIL-SAFE: never submit if the tailored resume isn't the attached one.
@@ -608,6 +755,20 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
                 return {"status": "blocked_missing_documents",
                         "detail": "Transcript section present but no transcript attached "
                                   "(need a 'Transcript' doc in /docs). NOT submitting.", **base}
+            # FAIL-SAFE: the generic 'other required documents' section is enforced on submit
+            # (Handshake enables Submit but rejects an empty one). Don't submit unless we
+            # attached the doc the employer asked for — a miss means we either don't have a
+            # matching doc (e.g. a portfolio) or the attach didn't take.
+            if has_other_docs_section and not other_docs_ok:
+                browser.shot(page, SHOTS, f"apply_{jid}_blocked")
+                _close(page)
+                br.close()
+                want = other_doc_match[0] if other_doc_match else "a document we don't have on file"
+                instr = _other_docs_instruction(mtext)
+                return {"status": "blocked_missing_documents",
+                        "detail": f"'Attach other required documents' requires {want} "
+                                  f"(employer note: {instr[:120]!r}) but none attached. NOT submitting.",
+                        **base}
             if blocker:
                 _close(page)
                 br.close()
@@ -650,6 +811,8 @@ def apply_to_job(job, resume_pdf, answers=None, mode="dry", approved=False, cove
                     "resume_ok": resume_ok, "cover_ok": cover_ok,
                     "transcript_attached": transcript_attached,
                     "has_transcript_section": has_transcript_section,
+                    "has_other_docs_section": has_other_docs_section,
+                    "attached_other_doc": other_doc_attached,
                     "unanswered_required": [a["question"] for a in qa
                                             if a.get("source") == "none" and a.get("required")]})
                 if decision.get("action") == "block":
