@@ -14,6 +14,7 @@ config.json
 resume_templates/Resume_SWE_General.tex
 resume_templates/Resume_AI-ML_General.tex
 resume_templates/memory.txt
+resume_templates/project_bank.md
 
 # ── Generated outputs (regenerated each run; personal) ───────────────────────
 logs/*

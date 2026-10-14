@@ -2,9 +2,10 @@
 """
 Tailor a resume for one Handshake job using the ResumeBot2.1 process.
 
-Adapted from nuworks_autoapply/tailor.py — same engine, repointed to the SHARED
-ResumeBot2.1 templates in ../nuworks_autoapply/resume_templates (do not fork;
-one edit benefits both) and Handshake's own applications/ + resumes/ dirs.
+Adapted from nuworks_autoapply/tailor.py — same engine, with its OWN copy of the
+ResumeBot2.1 templates in ./resume_templates (kept standalone for the repo; sync
+edits from ../nuworks_autoapply/resume_templates by hand) and Handshake's own
+applications/ + resumes/ dirs.
 
 For unattended runs this shells out to `claude -p` headless, feeding the
 ResumeBot2.1 system_instructions as the system prompt and pointing it at the two
@@ -35,7 +36,16 @@ RESUMEBOT = HERE / "resume_templates"   # base .tex variants + system_instructio
 APPS = HERE / "applications"
 RESUMES = HERE / "resumes"          # consolidated copies of every tailored resume
 INSTRUCTIONS = RESUMEBOT / "system_instructions.md"
+PROJECT_BANK = RESUMEBOT / "project_bank.md"   # personal, gitignored
 BASE_VARIANTS = ["Resume_SWE_General.tex", "Resume_AI-ML_General.tex"]
+
+
+def load_instructions() -> str:
+    """System prompt = ResumeBot2.1 instructions + the Project Bank appendix (if present)."""
+    s = INSTRUCTIONS.read_text()
+    if PROJECT_BANK.exists():
+        s += "\n\n---\n\n" + PROJECT_BANK.read_text()
+    return s
 
 
 def _pascal(s: str) -> str:
@@ -107,6 +117,11 @@ TAILOR_MODEL = "claude-sonnet-4-6"
 ESCALATION_MODEL = "claude-opus-4-8"
 ESCALATION_ATTEMPTS = 3
 
+# Global settings run at effortLevel xhigh; inherited by `claude -p`, the tailor
+# thinks until it hits the output-token cap (thinking only, no .tex — every
+# attempt times out). Pin tailoring to medium.
+TAILOR_EFFORT = "medium"
+
 
 def max_total_attempts(retries: int = claude_runner.DEFAULT_RETRIES) -> int:
     return (max(retries, 1) + 2) + ESCALATION_ATTEMPTS
@@ -130,9 +145,13 @@ def tailor_with_claude(job: dict, timeout: int = claude_runner.DEFAULT_TIMEOUT,
         "CRITICAL — PRESERVE DENSITY: the chosen base variant is ALREADY a complete, "
         "well-balanced ONE-page resume. Your job is to EDIT its text in place to weave "
         "in keywords, NOT to shorten it. Keep its full structure: every Skills category "
-        "line, every work-experience bullet (typically 3/2/3 across the three jobs), the "
-        "full coursework line, and BOTH bullet points under EACH project. Do NOT delete "
-        "skill lines, bullets, or projects, and do NOT leave a half-empty page of white "
+        "line, every work-experience bullet (typically 3/2/2 across the three jobs), the "
+        "full coursework lines, and every project bullet (lead project 3, others 2). "
+        "There is NO Summary section — never add one; put the exact job title in the "
+        "headline under the name. PROJECTS: choose 3 projects from the Project Bank "
+        "appendix by keyword fit (section 4E) — the base's projects are only a default; "
+        "add a 4th only if the page clearly has room, and never invent a project. "
+        "Do NOT delete skill lines or bullets, and do NOT leave a half-empty page of white "
         "space — the finished resume must look as full as the base variant. Rewrite "
         "bullets to roughly the same length they already are. "
         f"Write the final result to a file named exactly {tex_name} in this directory. "
@@ -145,12 +164,13 @@ def tailor_with_claude(job: dict, timeout: int = claude_runner.DEFAULT_TIMEOUT,
         return (
             f"The resume {tex_name} currently compiles to {pages} pages, but it MUST be "
             f"EXACTLY ONE page — and only slightly over. Edit {tex_name} to recover the "
-            "overflow by TIGHTENING wording, not by gutting content: shorten the longest "
-            "bullets (cut filler words, merge redundant phrasing) so each is under ~29 "
-            "words, and trim the Summary if it runs 3+ lines. Do this FIRST and only as "
-            "much as needed. Do NOT delete whole skill-category lines, do NOT drop a "
-            "project or a project's bullet, and do NOT remove a work-experience entry "
-            "unless tightening every bullet still leaves it over one page. The result "
+            "overflow IN THIS ORDER, stopping as soon as it fits: (1) shorten the Others "
+            "skills line, then the Certifications line (drop the least job-relevant items); "
+            "(2) tighten the longest bullets (cut filler, merge redundant phrasing) so each "
+            "is under ~29 words; (3) if there are 4 projects, remove the least relevant one; "
+            "(4) shorten the coursework lines. Never go below 3 projects, never drop a "
+            "skill-category line or a work-experience entry or bullet, and never add a "
+            "Summary section. The result "
             "must stay as full and dense as a normal one-page resume — never leave large "
             "white space. Keep all true metrics and the keyword-rich content. Do NOT "
             "change margins, geometry, font size, \\vspace values, or any preamble. You "
@@ -166,7 +186,7 @@ def tailor_with_claude(job: dict, timeout: int = claude_runner.DEFAULT_TIMEOUT,
     last_pages = 0
     attempt_no = 0
     escalated = False
-    instructions = INSTRUCTIONS.read_text()
+    instructions = load_instructions()
 
     for phase_idx, (model, n_attempts) in enumerate(phases):
         if phase_idx > 0:
@@ -185,7 +205,8 @@ def tailor_with_claude(job: dict, timeout: int = claude_runner.DEFAULT_TIMEOUT,
 
             run = claude_runner.run_claude_p(
                 prompt, d, append_system_prompt=instructions,
-                add_dir=str(d), timeout=timeout, model=model)
+                add_dir=str(d), timeout=timeout, model=model,
+                effort=TAILOR_EFFORT)
             runs.append(run)
             claude_runner._append_attempt_log(log_path, attempt_no, total, run)
 

@@ -40,7 +40,7 @@ def run_claude_p(prompt: str, cwd, *, append_system_prompt: str = None,
                  add_dir: str = None, timeout: int = DEFAULT_TIMEOUT,
                  max_turns: int = DEFAULT_MAX_TURNS,
                  permission_mode: str = "acceptEdits",
-                 model: str = None) -> dict:
+                 model: str = None, effort: str = None) -> dict:
     """Run a single `claude -p` invocation with a guaranteed wall-clock bound.
 
     `model` pins the invocation to a specific model (e.g. "claude-sonnet-4-6");
@@ -52,6 +52,8 @@ def run_claude_p(prompt: str, cwd, *, append_system_prompt: str = None,
            "--max-turns", str(max_turns)]
     if model:
         cmd += ["--model", model]
+    if effort:   # overrides the global effortLevel (xhigh) for this call only
+        cmd += ["--effort", effort]
     if append_system_prompt:
         cmd += ["--append-system-prompt", append_system_prompt]
     if add_dir:
